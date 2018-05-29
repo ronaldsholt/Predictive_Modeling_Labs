@@ -1,0 +1,236 @@
+---
+title: "Lab 2"
+author: "Ronald Holt"
+date: "5/24/2018"
+output: pdf_document
+---
+
+```{r setup, include=TRUE}
+
+# decision tree example 
+
+library(readr)
+
+data <- read_csv("cancer2.csv")
+
+#data <- cancer2
+#data <- within(data, rm(id, X33))
+
+library(rpart)
+#library(rattle)
+library(caret)
+
+ttrain <- sample(1:569, 455)
+test <- setdiff(1:569, ttrain)
+
+data_train = data[ttrain,]
+data_test = subset(data[test,], select =-diagnostic)
+
+#set to factor
+data$diagnostic <- as.factor(data$diagnostic)
+rpartTree <- rpart(diagnostic ~ ., data=data_train)
+# try with xval, minbucket, minsplit and cp parms
+
+out = predict(rpartTree, data_test, type = "class")
+
+confusionMatrix(out, data[test,]$diagnostic)
+
+library(rpart.plot)
+rpart.plot(rpartTree)
+
+### step 2
+
+temp <- rpart.control(xval=10, 
+                      minbucket = 2, 
+                      minsplit = 4, 
+                      cp = 0)
+
+dfit <- rpart(diagnostic ~ ., data = data_train, control = temp)
+
+rpart.plot(dfit)
+
+#using rpart with a 10-fold cross validation 
+fitControl <-  trainControl(method = 'cv', number = 10)
+
+Grid <- expand.grid(cp=seq(0, 0.05, 0.005))
+#run the training 
+
+
+library(caret)
+trained_tree <- caret::train(diagnostic ~ ., data = data_train , method = 'rpart', tuneGrid = Grid, trControl = fitControl, metric ='Accuracy',
+                      maximize = TRUE)
+
+
+trained_tree
+
+out2 <- predict(trained_tree, data_test, type='raw')
+confusionMatrix(out2, data[test,]$diagnostic)
+
+
+##### Bagging
+
+library(ipred)
+#data_train$diagnostic <- as.factor(data$diagnostic)
+baggedTree <- bagging(as.factor(diagnostic) ~ ., data = data_train)
+out3 <- predict(baggedTree, data_test)
+confusionMatrix(out3, data[test,]$diagnostic)
+
+baggedTree <- bagging(as.factor(diagnostic) ~ ., data = data_train, nbagg = 4)
+mod <- train(diagnostic ~ ., data = data_train, method="treebag", trControl =fitControl, metric = "Accuracy", maximize = TRUE)
+
+mod
+
+
+### 1.3 Random Forest 
+
+
+library(randomForest)
+
+rfModel <- randomForest(as.factor(diagnostic) ~ ., data = data_train)
+rfModel
+
+out5 <- predict(rfModel, data_test)
+confusionMatrix(out5, data[test,]$diagnostic)
+
+
+rfModel <- randomForest(as.factor(diagnostic) ~ ., data = data_train, ntree = 10, mtry=4)
+rfModel
+
+control <- trainControl(method = 'repeatedcv', number = 10, repeats = 3)
+metric <- "Accuracy"
+
+
+n <- round(sqrt(ncol(data_train)))
+tunegrid <- expand.grid(.mtry=seq(4,n,1))
+
+
+rf_default <- train(diagnostic ~ ., data = data_train, method = 'rf', metric = metric, tuneGrid = tunegrid,
+                                          trConrtol=control)
+
+rf_default
+
+### Variable importance
+Imp <- varImp(rpartTree)
+Imp
+
+Imp <- varImp(mod)
+Imp
+
+####################### Homework #########################
+
+data <- read.csv('https://archive.ics.uci.edu/ml/machine-learning-databases/glass/glass.data', header=FALSE)
+
+
+names(data)[1] <-"Id" #number: 1 to 214
+names(data)[2] <-"RI" # refractive index
+names(data)[3] <-"Na" #Sodium #(unit measurement: weight percent in corresponding oxide, as are attributes 4-10)
+names(data)[4] <-"Mg" #Magnesium
+names(data)[5] <-"Al" #Aluminum
+names(data)[6] <-"Si" #Silicon
+names(data)[7] <-"K" #Potassium
+names(data)[8] <-"Ca" #Calcium
+names(data)[9] <-"Ba" #Barium
+names(data)[10] <-"Fe" #Iron
+names(data)[11] <-"class" #(class attribute)
+
+data$class <- as.factor(data$class)
+train <- sample(1:214, 171)
+test <- setdiff(1:214, train)
+
+data_train = data[train,]
+data_test = subset(data[test,], select =-class)
+
+#set to factor
+data$class <- as.factor(data$class)
+rpartTree <- rpart(class ~ ., data=data_train)
+# try with xval, minbucket, minsplit and cp parms
+
+out = predict(rpartTree, data_test, type = "class")
+
+confusionMatrix(out, data[test,]$class)
+
+library(rpart.plot)
+rpart.plot(rpartTree)
+
+### step 2
+
+temp <- rpart.control(xval=10, 
+                      minbucket = 2, 
+                      minsplit = 4, 
+                      cp = 0)
+
+dfit <- rpart(class ~ ., data = data_train, control = temp)
+
+rpart.plot(dfit)
+
+#using rpart with a 10-fold cross validation 
+fitControl <-  trainControl(method = 'cv', number = 10)
+
+Grid <- expand.grid(cp=seq(0, 0.05, 0.005))
+#run the training 
+
+
+library(caret)
+trained_tree <- caret::train(class ~ ., data = data_train , method = 'rpart', 
+                             tuneGrid = Grid, trControl = fitControl, metric ='Accuracy',
+                             maximize = TRUE)
+
+
+trained_tree
+
+out2 <- predict(trained_tree, data_test, type='raw')
+confusionMatrix(out2, data[test,]$class)
+
+#### Bagging 
+
+library(ipred)
+#data_train$diagnostic <- as.factor(data$diagnostic)
+baggedTree <- bagging(as.factor(class) ~ ., data = data_train)
+out3 <- predict(baggedTree, data_test)
+confusionMatrix(out3, data[test,]$class)
+
+baggedTree <- bagging(as.factor(class) ~ ., data = data_train, nbagg = 20)
+mod <- train(class ~ ., data = data_train, method="treebag", 
+                  trControl =fitControl, 
+                  metric = "Accuracy", maximize = TRUE)
+
+mod
+
+out7 <- predict(mod, data_test, type='raw')
+confusionMatrix(out7, data[test,]$class)
+
+
+### use train function to build a random forest 
+library(randomForest)
+
+rfModel <- randomForest(as.factor(class) ~ ., data = data_train)
+rfModel
+
+out5 <- predict(rfModel, data_test)
+confusionMatrix(out5, data[test,]$class)
+
+
+rfModel <- randomForest(as.factor(class) ~ ., data = data_train, ntree = 10, mtry=4)
+rfModel
+
+control <- trainControl(method = 'repeatedcv', number = 10, repeats = 3)
+metric <- "Accuracy"
+
+
+n <- round(sqrt(ncol(data_train)))
+tunegrid <- expand.grid(.mtry=seq(3,n,1))
+
+
+rf_default <- train(class ~ ., data = data_train, method = 'rf', metric = metric, tuneGrid = tunegrid,
+                    trConrtol=control)
+
+rf_default
+
+### Variable importance
+Imp <- varImp(rpartTree)
+Imp
+
+Imp <- varImp(mod)
+Imp
+
+```
